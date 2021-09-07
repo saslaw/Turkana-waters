@@ -1,0 +1,270 @@
+---
+title: "Lake water evaporation model and mass balance calculations for Lake Turkana, Kenya"
+output: 
+  html_notebook: 
+    highlight: monochrome
+  html_document: 
+    highlight: monochrome
+editor_options: 
+  chunk_output_type: inline
+bibliography: references.bib
+link-citations: true 
+reference-section-title: "References"
+---
+
+```{r, setup, echo=FALSE, include=FALSE}
+
+knitr::opts_chunk$set(echo=TRUE)
+pacman::p_load(here, knitr, tidyverse, kableExtra, ggthemes)
+```
+
+# Local evaporation line model
+
+## Define model function
+
+The function produces a plot-able data frame of δ^18^O and δD values representing isotopic composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined by @gibson2016 and @horita1994.
+
+```{r define-model}
+model.LEL <- function(env.input){
+  
+  # Celsius to Kelvin conversion
+  TK <- env.input["TC"] + 273.15
+  
+  # liquid-vapor fractionation factors (Horita & Wesolowski 1994)
+  aD <- exp( ((1158.8 * TK^3)/1e12) - ((1620.1 * TK^2)/1e9) + ((794.84 * TK)/1e6) - (161.04/1e3)  + (2.992e6/TK^3) )
+  a18O <- exp( (-7.685e-3) + (6.7123 / TK) - (1.6664e3 / TK^2) + (0.35041e6 / TK^3) )
+  
+  # equilibrium isotopic separation (ibid.)
+  eD <- (aD - 1) * 1000
+  e18O <- (a18O - 1) * 1000
+  
+  # diffusion controlled fractionation (ibid.)
+  ekD <- 12.5 * (1 - env.input["rh"])
+  ek18O <- 14.2 * (1 - env.input["rh"])
+  
+  # atmospheric isotope ratios (Gibson et al 2016 eqn 18) 
+  dDA <- (env.input["dDi"] - (env.input["k"] * eD)) / 
+    (1 + (1e-3 * env.input["k"] * eD))
+  d18OA <- (env.input["d18Oi"] - (env.input["k"] * e18O)) / 
+    (1 + (1e-3 * env.input["k"] * e18O))
+  
+  # limiting isotope ratios (Gibson et al 2016 eqn 7)
+  dstarD <- ((env.input["rh"] * dDA) + ekD + (eD / aD)) / 
+    (env.input["rh"] - (1e-3 * (ekD + (eD / aD))))
+  dstar18O <- ((env.input["rh"] * d18OA) + ek18O + (e18O / a18O)) / 
+    (env.input["rh"] - (1e-3 * (ek18O + (e18O / a18O))))
+  
+  # temporal enrichment slope (Gibson et al 2016 eqn 6)
+  mD <- (env.input["rh"] - (1e-3 * (ekD + (eD / aD)))) /
+    ((1 - env.input["rh"]) + (1e-3 * ekD))
+  m18O <- (env.input["rh"] - (1e-3 * (ek18O + (e18O / a18O)))) / 
+    ((1 - env.input["rh"]) + (1e-3 * ek18O))
+  
+  # create values for evaporation to inflow ratio (x = E / I) from 0 (no evaporation, lake growing) to 1 (fully evaporated lake)
+  # adjust "by" param up or down to have fewer or more points on the model line
+  x <- seq(from = 0, to = 1, by = 0.07) 
+  
+  # lake water isotopes for values of x (Gibson et al 2016 eqn 10) and vapor isotopes (eqn 3)
+  dDL <- (env.input["dDi"]  + (mD * x * dstarD)) / (1 + mD * x)
+  d18OL <- (env.input["d18Oi"] + (m18O * x * dstar18O)) / (1 + m18O * x)
+  dDv <- (((dDL - eD) / aD) - (env.input["rh"] * dDA) - ekD) / (1 - env.input["rh"] + (1e-3 * ekD))
+  d18Ov <- (((d18OL - e18O) / a18O) - (env.input["rh"] * d18OA) - ek18O) / (1 - env.input["rh"] + (1e-3 * ek18O))
+  
+  # combine modeled lake and vapor delta values in data frame for plotting
+  dL <- as.data.frame(cbind("d18O" = d18OL, "dD" = dDL))
+  dv <- as.data.frame(cbind("d18O" = d18Ov, "dD" = dDv))
+  model.line <- as.data.frame(rbind(dL, dv))
+  
+  return(model.line)
+}
+```
+
+## Model inputs
+
+The following iteration uses water isotope data from the Omo River in @levin2009. Atmospheric conditions are roughly approximated and should be iterated over and scrutinized. The resulting evaporation line represents these inputs given to the function above.
+
+```{r model-inputs-1}
+env.conditions <- c(
+  
+  # average air temperature (C); evaporation model is most accurate given an air-water interface temperature 
+  "TC" = 28,
+  
+  # average humidity (%rh); evaporation model is most accurate given a value normalized to water surface temperature
+  "rh" = 0.60,
+  
+  # d18O & dD (permil VSMOW) for lake water input 
+  "d18Oi" = -1,
+  "dDi"   = 5,
+  
+  # degree to which there is isotopic equilibrium between precipitation and atmospheric water vapor
+  "k" = 0.1
+)
+
+result.LEL <- model.LEL(env.conditions)
+```
+
+## Plot model with data
+
+### Load and filter data (this study)
+
+*To do:* Talk about the "Evaporated Surface" data points — all but one are from TBI-Ileret and appear on a line in plot 1; the last is from a pond in Topernawi laga. We should try to find out more about the Ileret conditions and what they capture; the line looks roughly parallel to the LEL. What is the relevance of the Topernawi data point? Is it worth comparing one point each from Topernawi laga and lake shore? 
+
+```{r waters-all}
+waters.all <- read.csv(here("data/2016-2020_waters.csv"))
+
+waters.lake.inputs <- waters.all %>% 
+  filter(WaterType == "Lake" | WaterType == "River" | WaterType == "Precipitation")
+
+kable(waters.lake.inputs %>%
+      select(SampleID, Date, WaterType, Location, d18O, dD, Dexcess),
+      format="html") %>%
+      kable_styling() %>%
+      scroll_box(height="220px", width="100%")
+```
+
+### Define plot aesthetics
+
+Themes, colors, axis labels, axis limits, etc. should be defined here for re-use across plots. Axis limits using all data from this study will include the anomalous Lothagam saline well sample; it may be preferable to remove the sample or omit all groundwater samples from some plots, if appropriate, given that groundwater input to the lake is considered negligible (citation needed). Eventually, axis limits set below should be applied to all plots for consistency. Colorblind-friendly palette from @tol2018.
+
+```{r plot-aesthetics, echo=FALSE}
+theme_set(theme_tufte(base_family = "Helvetica"))
+
+axis.x.max <- max(waters.all$d18O) + 0.5
+axis.x.min <- min(waters.all$d18O) - 0.5
+axis.y.max <- max(waters.all$dD) + 0.5
+axis.y.min <- min(waters.all$dD) - 0.5
+
+axis.x.label <- expression(paste(delta^{18}, "O (‰ VSMOW)"))
+axis.y.label <- expression(paste(delta, "D (‰ VSMOW)"))
+
+color.lake <- "#228833"
+color.precip <- "#66CCEE"
+color.river <- "#4477AA"
+color.ground <- "#EE6677"
+color.surface <- "#CCBB44"
+color.GMWL <- "gray19"
+color.model <- "gray69"
+
+shape.lake <- 16 # circle
+shape.precip <- 17 # triangle
+shape.river <- 15 # square
+shape.ground.deep <- 7 # x in box
+shape.ground.shallow <- 4 # x
+shape.surface.evap <- 5 # diamond empty
+shape.surface.lake <- 1 # circle empty
+shape.model <- 3 # cross 
+
+```
+
+### Plot \#1 (all data)
+
+```{r plot-1, echo=FALSE}
+plot1 <- ggplot(data=waters.all, aes(x=d18O, y=dD, shape=WaterType, color=WaterType), show.legend=FALSE) +
+  geom_point() +
+  geom_abline(data=NULL, aes(slope=8, intercept=10, color="GMWL")) +
+
+  # legend
+  scale_shape_manual(
+    breaks=c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"), 
+    # set plot element shapes
+    values=c(
+      "Lake" = shape.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Shallow Ground" = shape.ground.shallow,
+      "Deep Ground" = shape.ground.deep,
+      "Evaporated Surface" = shape.surface.evap,
+      "Restricted Lake" = shape.surface.lake,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks=c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"),
+    # set plot element colors
+    values=c(
+      "Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Shallow Ground" = color.ground,
+      "Deep Ground" = color.ground,
+      "Evaporated Surface" = color.surface,
+      "Restricted Lake" = color.lake,
+      "GMWL" = color.GMWL)) +
+  
+  guides(shape=FALSE, color=guide_legend(override.aes=list(
+    linetype=c(rep("blank", 7), "solid"),
+    shape=c(shape.lake, shape.river, shape.precip, shape.ground.shallow, shape.ground.deep, shape.surface.evap, shape.surface.lake, NA),
+    size=3))) +
+  
+  # axes and titles
+  coord_cartesian(xlim=c(axis.x.min, axis.x.max), ylim=c(axis.y.min, axis.y.max)) + 
+  theme(legend.title=element_blank(), 
+        panel.border=element_rect(fill = NA)) + 
+  labs(x = axis.x.label, 
+       y = axis.y.label)
+
+plot(plot1)
+```
+
+ggplot mystery: Why is the legend symbol for GMWL like that?
+
+### Plot \#2 (best model)
+
+Local evaporation model for environmental conditions: `r paste(names(env.conditions), "=", env.conditions, collapse=", ")`
+
+```{r plot-2, echo=FALSE}
+plot2 <- ggplot(data=result.LEL, aes(x=d18O, y=dD, color="Modeled LEL")) +
+  
+  # plot elements
+  geom_point(shape=shape.model) + geom_line() +
+  geom_point(data=waters.lake.inputs, aes(x=d18O, y=dD, color=WaterType, shape=WaterType), size = 2, show.legend=FALSE) +
+  geom_abline(data=NULL, aes(slope=8, intercept=10, color="GMWL"), show.legend=FALSE) +
+  
+  # legend
+  scale_shape_manual(
+    breaks=c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
+    # set plot element shapes
+    values=c(
+      "Lake" = shape.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Modeled LEL" = shape.model,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks=c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
+    # set plot element colors
+    values=c(
+      "Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Modeled LEL" = color.model,
+      "GMWL" = color.GMWL)) +
+  
+  guides(color=guide_legend(override.aes=list(
+    linetype=c(rep("blank", 3), rep("solid", 2)),
+    shape=c(shape.lake, shape.river, shape.precip, shape.model, NA),
+    size=2))) +
+  
+  # axes and titles
+  coord_cartesian(xlim=c(-5,9), ylim=c(-25,50)) + 
+  theme(legend.title=element_blank(), 
+        panel.border=element_rect(fill = NA)) + 
+  labs(x = axis.x.label, 
+       y = axis.y.label,
+       caption=paste(names(env.conditions), "=", env.conditions, collapse=", "))
+
+plot(plot2)
+
+```
+
+## De-trended lake data
+
+*To do:* Subtract LEL model from lake data to check for fit
+
+Like this?
+
+-   Get linear equation for LEL
+
+-   Apply linear function to lake δ^18^O values to produce data frame of real δ^18^O vs modeled δD
+
+-   Use `detrend()` to remove linear trend from new data frame
