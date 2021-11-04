@@ -1,20 +1,18 @@
 ---
 title: "Lake water evaporation model and mass balance calculations for Lake Turkana, Kenya"
+date: 2021-11-03
 output: 
-  html_notebook: 
-    highlight: monochrome
   html_document: 
+    highlight: monochrome
+  html_notebook: 
     highlight: monochrome
 editor_options: 
   chunk_output_type: inline
-bibliography: references.bib
-link-citations: true 
 reference-section-title: "References"
 ---
 
-```{r, setup, echo=FALSE, include=FALSE}
-
-knitr::opts_chunk$set(echo=TRUE)
+```{r, setup, echo = FALSE, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(here, knitr, tidyverse, kableExtra, ggthemes)
 ```
 
@@ -22,7 +20,7 @@ pacman::p_load(here, knitr, tidyverse, kableExtra, ggthemes)
 
 ## Define model function
 
-The function produces a plot-able data frame of δ^18^O and δD values representing isotopic composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined by @gibson2016 and @horita1994.
+The function produces a plot-able data frame of δ^18^O and δD values representing isotope composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined in @gibson2016 and @horita1994.
 
 ```{r define-model}
 model.LEL <- function(env.input){
@@ -43,9 +41,9 @@ model.LEL <- function(env.input){
   ek18O <- 14.2 * (1 - env.input["rh"])
   
   # atmospheric isotope ratios (Gibson et al 2016 eqn 18) 
-  dDA <- (env.input["dDi"] - (env.input["k"] * eD)) / 
+  dDA <- (env.input["dDp"] - (env.input["k"] * eD)) / 
     (1 + (1e-3 * env.input["k"] * eD))
-  d18OA <- (env.input["d18Oi"] - (env.input["k"] * e18O)) / 
+  d18OA <- (env.input["d18Op"] - (env.input["k"] * e18O)) / 
     (1 + (1e-3 * env.input["k"] * e18O))
   
   # limiting isotope ratios (Gibson et al 2016 eqn 7)
@@ -81,7 +79,7 @@ model.LEL <- function(env.input){
 
 ## Model inputs
 
-The following iteration uses water isotope data from the Omo River in @levin2009. Atmospheric conditions are roughly approximated and should be iterated over and scrutinized. The resulting evaporation line represents these inputs given to the function above.
+Build model evaporation lines using environmental conditions The resulting evaporation line represents these inputs given to the function above.
 
 ```{r model-inputs-1}
 env.conditions <- c(
@@ -90,11 +88,15 @@ env.conditions <- c(
   "TC" = 28,
   
   # average humidity (%rh); evaporation model is most accurate given a value normalized to water surface temperature
-  "rh" = 0.60,
+  "rh" = 0.25,
   
   # d18O & dD (permil VSMOW) for lake water input 
-  "d18Oi" = -1,
-  "dDi"   = 5,
+  "d18Oi" = -0.4,
+  "dDi"   = 9,
+  
+  # d18O & dD (permil VSMOW) for precipitation
+  "d18Op" = 0.9,
+  "dDp"   = 10,
   
   # degree to which there is isotopic equilibrium between precipitation and atmospheric water vapor
   "k" = 0.1
@@ -107,26 +109,26 @@ result.LEL <- model.LEL(env.conditions)
 
 ### Load and filter data (this study)
 
-*To do:* Talk about the "Evaporated Surface" data points — all but one are from TBI-Ileret and appear on a line in plot 1; the last is from a pond in Topernawi laga. We should try to find out more about the Ileret conditions and what they capture; the line looks roughly parallel to the LEL. What is the relevance of the Topernawi data point? Is it worth comparing one point each from Topernawi laga and lake shore? 
+*To do:* Talk about the "Evaporated Surface" data points --- all but one are from TBI-Ileret and appear on a line in plot 1; the last is from a pond in Topernawi laga. We should try to find out more about the Ileret conditions and what they capture; the line looks roughly parallel to the LEL. What is the relevance of the Topernawi data point? Is it worth comparing one point each from Topernawi laga and lake shore?
 
-```{r waters-all}
+```{r waters-all, echo = FALSE}
 waters.all <- read.csv(here("data/2016-2020_waters.csv"))
 
-waters.lake.inputs <- waters.all %>% 
+waters.meteoric <- waters.all |> 
   filter(WaterType == "Lake" | WaterType == "River" | WaterType == "Precipitation")
 
-kable(waters.lake.inputs %>%
+kable(waters.all |> 
       select(SampleID, Date, WaterType, Location, d18O, dD, Dexcess),
-      format="html") %>%
-      kable_styling() %>%
+      format="html") |> 
+      kable_styling() |> 
       scroll_box(height="220px", width="100%")
 ```
 
 ### Define plot aesthetics
 
-Themes, colors, axis labels, axis limits, etc. should be defined here for re-use across plots. Axis limits using all data from this study will include the anomalous Lothagam saline well sample; it may be preferable to remove the sample or omit all groundwater samples from some plots, if appropriate, given that groundwater input to the lake is considered negligible (citation needed). Eventually, axis limits set below should be applied to all plots for consistency. Colorblind-friendly palette from @tol2018.
+Colorblind-friendly palette from @tol2018.
 
-```{r plot-aesthetics, echo=FALSE}
+```{r plot-aesthetics, echo = FALSE}
 theme_set(theme_tufte(base_family = "Helvetica"))
 
 axis.x.max <- max(waters.all$d18O) + 0.5
@@ -153,77 +155,25 @@ shape.ground.shallow <- 4 # x
 shape.surface.evap <- 5 # diamond empty
 shape.surface.lake <- 1 # circle empty
 shape.model <- 3 # cross 
-
 ```
 
-### Plot \#1 (all data)
-
-```{r plot-1, echo=FALSE}
-plot1 <- ggplot(data=waters.all, aes(x=d18O, y=dD, shape=WaterType, color=WaterType), show.legend=FALSE) +
-  geom_point() +
-  geom_abline(data=NULL, aes(slope=8, intercept=10, color="GMWL")) +
-
-  # legend
-  scale_shape_manual(
-    breaks=c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"), 
-    # set plot element shapes
-    values=c(
-      "Lake" = shape.lake,
-      "River" = shape.river,
-      "Precipitation" = shape.precip,
-      "Shallow Ground" = shape.ground.shallow,
-      "Deep Ground" = shape.ground.deep,
-      "Evaporated Surface" = shape.surface.evap,
-      "Restricted Lake" = shape.surface.lake,
-      "GMWL" = 1)) +
-  
-  scale_color_manual(
-    breaks=c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"),
-    # set plot element colors
-    values=c(
-      "Lake" = color.lake,
-      "River" = color.river,
-      "Precipitation" = color.precip,
-      "Shallow Ground" = color.ground,
-      "Deep Ground" = color.ground,
-      "Evaporated Surface" = color.surface,
-      "Restricted Lake" = color.lake,
-      "GMWL" = color.GMWL)) +
-  
-  guides(shape=FALSE, color=guide_legend(override.aes=list(
-    linetype=c(rep("blank", 7), "solid"),
-    shape=c(shape.lake, shape.river, shape.precip, shape.ground.shallow, shape.ground.deep, shape.surface.evap, shape.surface.lake, NA),
-    size=3))) +
-  
-  # axes and titles
-  coord_cartesian(xlim=c(axis.x.min, axis.x.max), ylim=c(axis.y.min, axis.y.max)) + 
-  theme(legend.title=element_blank(), 
-        panel.border=element_rect(fill = NA)) + 
-  labs(x = axis.x.label, 
-       y = axis.y.label)
-
-plot(plot1)
-```
-
-ggplot mystery: Why is the legend symbol for GMWL like that?
-
-### Plot \#2 (best model)
+### Model with meteoric waters
 
 Local evaporation model for environmental conditions: `r paste(names(env.conditions), "=", env.conditions, collapse=", ")`
 
-```{r plot-2, echo=FALSE}
-plot2 <- ggplot(data=result.LEL, aes(x=d18O, y=dD, color="Modeled LEL")) +
+```{r LEL-meteoric, echo = TRUE}
+plot.LEL <- ggplot(data = result.LEL, aes(x = d18O, y = dD, color = "Modeled LEL")) +
   
   # plot elements
-  geom_point(shape=shape.model) + geom_line() +
-  geom_point(data=waters.lake.inputs, aes(x=d18O, y=dD, color=WaterType, shape=WaterType), size = 2, show.legend=FALSE) +
-  geom_abline(data=NULL, aes(slope=8, intercept=10, color="GMWL"), show.legend=FALSE) +
+  geom_point(shape = shape.model) + geom_line() +
+  geom_point(data = waters.meteoric, aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = 2, show.legend = FALSE) +
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL"), show.legend = FALSE) +
   
   # legend
   scale_shape_manual(
-    breaks=c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
+    breaks = c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
     # set plot element shapes
-    values=c(
+    values = c(
       "Lake" = shape.lake,
       "River" = shape.river,
       "Precipitation" = shape.precip,
@@ -231,33 +181,38 @@ plot2 <- ggplot(data=result.LEL, aes(x=d18O, y=dD, color="Modeled LEL")) +
       "GMWL" = 1)) +
   
   scale_color_manual(
-    breaks=c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
+    breaks = c("Lake", "River", "Precipitation", "Modeled LEL", "GMWL"), 
     # set plot element colors
-    values=c(
+    values = c(
       "Lake" = color.lake,
       "River" = color.river,
       "Precipitation" = color.precip,
       "Modeled LEL" = color.model,
       "GMWL" = color.GMWL)) +
   
-  guides(color=guide_legend(override.aes=list(
-    linetype=c(rep("blank", 3), rep("solid", 2)),
-    shape=c(shape.lake, shape.river, shape.precip, shape.model, NA),
-    size=2))) +
+  guides(color = guide_legend(override.aes=list(
+    linetype = c(rep("blank", 3), rep("solid", 2)),
+    shape = c(shape.lake, shape.river, shape.precip, shape.model, NA),
+    size = 2))) +
   
   # axes and titles
-  coord_cartesian(xlim=c(-5,9), ylim=c(-25,50)) + 
-  theme(legend.title=element_blank(), 
-        panel.border=element_rect(fill = NA)) + 
+  coord_cartesian(xlim = c(-5,9), ylim = c(-25,50)) + 
+  theme(legend.title = element_blank(), 
+        panel.border = element_rect(fill = NA)) + 
   labs(x = axis.x.label, 
        y = axis.y.label,
-       caption=paste(names(env.conditions), "=", env.conditions, collapse=", "))
+       caption = paste(names(env.conditions), "=", env.conditions, collapse = ", "))
 
-plot(plot2)
-
+plot(plot.LEL)
 ```
+*To do:* Generate a 4 or 6 panel figure with four sets of input values. Use `apply()` for this? 
 
-## De-trended lake data
+
+## Test models
+
+*To do:* Get statistical comparison (ANOVA? T-test?) between each model LEL and the lake waters
+
+### De-trend lake data
 
 *To do:* Subtract LEL model from lake data to check for fit
 
@@ -268,3 +223,60 @@ Like this?
 -   Apply linear function to lake δ^18^O values to produce data frame of real δ^18^O vs modeled δD
 
 -   Use `detrend()` to remove linear trend from new data frame
+
+## All data
+
+*To do:* Add @levin2009
+
+```{r plot-all, echo = FALSE}
+plot.all <- ggplot(data = waters.all, aes(x = d18O, y = dD, shape = WaterType, color = WaterType), show.legend = FALSE) +
+  geom_point() +
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
+
+  # legend
+  scale_shape_manual(
+    breaks = c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"), 
+    # set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Shallow Ground" = shape.ground.shallow,
+      "Deep Ground" = shape.ground.deep,
+      "Evaporated Surface" = shape.surface.evap,
+      "Restricted Lake" = shape.surface.lake,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "River", "Precipitation", "Shallow Ground", "Deep Ground", "Evaporated Surface", "Restricted Lake", "GMWL"),
+    # set plot element colors
+    values = c(
+      "Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Shallow Ground" = color.ground,
+      "Deep Ground" = color.ground,
+      "Evaporated Surface" = color.surface,
+      "Restricted Lake" = color.lake,
+      "GMWL" = color.GMWL)) +
+  
+  guides(shape = "none", color = guide_legend(override.aes = list(
+    linetype = c(rep("blank", 7), "solid"),
+    shape = c(shape.lake, shape.river, shape.precip, shape.ground.shallow, shape.ground.deep, shape.surface.evap, shape.surface.lake, NA),
+    size = 3))) +
+  
+  # axes and titles
+  coord_cartesian(xlim = c(axis.x.min, axis.x.max), ylim = c(axis.y.min, axis.y.max)) + 
+  theme(legend.title = element_blank(), 
+        panel.border = element_rect(fill = NA)) + 
+  labs(x = axis.x.label, 
+       y = axis.y.label)
+
+plot(plot.all)
+```
+
+ggplot mystery: Why is the legend symbol for GMWL like that?
+
+## Mass balance
+
+Estimate lake volumes from [USDA Foreign Agriculture Service](https://ipad.fas.usda.gov/cropexplorer/global_reservoir/gr_regional_chart.aspx?regionid=eafrica&reservoir_name=Turkana&lakeid=000093) and estimate percent increases in inputs needed.
