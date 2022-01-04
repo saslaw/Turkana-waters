@@ -13,7 +13,7 @@ reference-section-title: "References"
 
 ```{r, setup, echo = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(here, knitr, tidyverse, lubridate, readxl, kableExtra, ggthemes)
+pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes)
 ```
 
 # Water isotope measurements
@@ -72,9 +72,7 @@ size.lg <- 5
 
 ### Load and process data (this study)
 
-*To do:* Talk about the "Evaporated Surface" data points --- all but one are from TBI-Ileret and appear on a line in plot 1; the last is from a pond in Topernawi laga. We should try to find out more about the Ileret conditions and what they capture; the line looks roughly parallel to the LEL. What is the relevance of the Topernawi data point? Is it worth comparing one point each from Topernawi laga and lake shore?
-
-```{r read-newdata, echo = TRUE, message = FALSE}
+```{r read-newdata, message = FALSE}
 waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"))
 
 # Simplify WaterType categories
@@ -140,7 +138,9 @@ plot(plot.waters.2021)
 
 ### Load and process published data (@levin2009)
 
-```{r read-Levin, echo = TRUE, message = FALSE}
+This data set includes measurements from the Ethiopian plateau, and other points outside of Turkana. Filter to Turkana data only using coordiantes, if necessary. 
+
+```{r read-Levin, message = FALSE}
 waters.Levin.rawdata <- read_excel(here("data/Levin_et_al_2009_raw_data.xls"))
 
 # Make WaterType categories consistent with this study
@@ -206,6 +206,41 @@ plot.waters.inclusive <- ggplot() +
 plot(plot.waters.inclusive)
 ```
 
+## Summary values
+
+Identify measured values that affect model inputs.
+
+```{r summary-data}
+waters.summary <- waters |>
+  group_by(WaterType) |>
+  summarize(d18O_mean = mean(d18O),
+            d18O_stdv = sd(d18O),
+            dD_mean = mean(dD),
+            dD_stdv = sd(dD)) |>
+  mutate(Source = "this study")
+
+waters.summary.Levin <- waters.Levin |>
+  group_by(WaterType) |>
+  summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
+            d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
+            dD_mean = mean(dD_VSMOW, na.rm = TRUE),
+            dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
+  mutate(Source = "Levin et al 2009")
+
+waters.summary <- rbind(waters.summary, waters.summary.Levin)
+
+Omo.River <- waters.Levin |>
+  filter(grepl("Omo River", Sampling_Location_and_Notes)) |>
+  # group_by(WaterType) |>
+  # summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
+  #           d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
+  #           dD_mean = mean(dD_VSMOW, na.rm = TRUE),
+  #           dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
+  mutate(Source = "Levin et al 2009")
+
+mean.surface.TC <- mean(waters$SurfaceTempC, na.rm = TRUE)
+mean.rh <- 0.33 # From TBI-Ileret PurpleAir sensor lifetime average
+```
 # Local evaporation line model
 
 ## Define model function
@@ -269,11 +304,9 @@ model.LEL <- function(env.input){
 
 ## Model inputs
 
-Build model evaporation lines using environmental conditions. The resulting evaporation line represents these inputs given to the function above.
+Build model evaporation lines using environmental conditions, starting with a single scenario.
 
-*To do*: Create a table of input values and generate model results across multiple scenarios
-
-```{r model-inputs-1}
+```{r model-inputs-single}
 env.conditions <- c(
   
   # average air temperature (C); evaporation model is most accurate given an air-water interface temperature 
@@ -297,14 +330,32 @@ env.conditions <- c(
 result.LEL <- model.LEL(env.conditions)
 ```
 
+### Create model scenarios
 
+Apply the model over a range of scenarios, varying different inputs. 
+*How do we use co-varying d18O & dD values that make sense together?*
+
+```{r model-inputs-vary}
+# Produce lists of incremental values 
+# length of 6 provides 6 rows for a table of inputs, 6 plots for a panel
+seq.length <- 6
+
+vary.TC <- seq(from = 20, to = 40, length.out = seq.length)
+vary.rh <- seq(from = 0.1, to = 0.6, length.out = seq.length)
+vary.d18Oi <- seq(from = -3.5, to = 1.5, length.out = seq.length)
+vary.dDi <- seq(from = -30, to = 20, length.out = seq.length)
+vary.d18Op <- seq(from = -3, to = 6, length.out = seq.length)
+vary.dDp <- seq(from = -30, to = 40, length.out = seq.length)
+vary.k <- seq(from = 0, to = 1, length.out = seq.length)
+
+```
 
 ### Model with meteoric waters
 
-Local evaporation model for environmental conditions: `r paste(names(env.conditions), "=", env.conditions, collapse=", ")`
+Single plot, LEL for environmental conditions: `r paste(names(env.conditions), "=", env.conditions, collapse=", ")`
 
-```{r LEL-meteoric, echo = TRUE}
-#Filter meteoric waters (all types except ground)
+```{r LEL-meteoric}
+# Filter meteoric waters (all types except ground)
 waters.meteoric <- waters |>
   filter(WaterType != "Ground")
 
@@ -352,8 +403,8 @@ plot.LEL <- ggplot(data = result.LEL, aes(x = d18O, y = dD, color = "Modeled LEL
 
 plot(plot.LEL)
 ```
-*To do:* Generate a 4 or 6 panel figure with four sets of input values. Use `apply()` for this? 
 
+*To do:* Generate a 4 or 6 panel figure with four sets of input values. Use `apply()` for this? 
 
 ## Test models
 
