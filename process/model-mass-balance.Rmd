@@ -1,6 +1,6 @@
 ---
 title: "Lake water evaporation model and mass balance calculations for Lake Turkana, Kenya"
-date: 2021-11-03
+date: 2022-01-04
 output: 
   html_document: 
     highlight: monochrome
@@ -13,7 +13,7 @@ reference-section-title: "References"
 
 ```{r, setup, echo = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(here, knitr, tidyverse, kableExtra, ggthemes)
+pacman::p_load(here, knitr, tidyverse, lubridate, readxl, kableExtra, ggthemes)
 ```
 
 # Local evaporation line model
@@ -81,6 +81,8 @@ model.LEL <- function(env.input){
 
 Build model evaporation lines using environmental conditions The resulting evaporation line represents these inputs given to the function above.
 
+*To do*: Create a table of input values and generate model results across multiple scenarios
+
 ```{r model-inputs-1}
 env.conditions <- c(
   
@@ -105,41 +107,38 @@ env.conditions <- c(
 result.LEL <- model.LEL(env.conditions)
 ```
 
-## Plot model with data
+## Plot data
 
 ### Load and filter data (this study)
 
 *To do:* Talk about the "Evaporated Surface" data points --- all but one are from TBI-Ileret and appear on a line in plot 1; the last is from a pond in Topernawi laga. We should try to find out more about the Ileret conditions and what they capture; the line looks roughly parallel to the LEL. What is the relevance of the Topernawi data point? Is it worth comparing one point each from Topernawi laga and lake shore?
 
-```{r waters-all, echo = FALSE}
-waters.all <- read.csv(here("data/2016-2020_waters.csv"))
+```{r waters-all, echo = TRUE, message = FALSE}
 
-waters.meteoric <- waters.all |> 
-  filter(WaterType == "Lake" | WaterType == "River" | WaterType == "Precipitation")
+waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"))
 
-kable(waters.all |> 
-      select(SampleID, Date, WaterType, Location, d18O, dD, Dexcess),
-      format="html") |> 
-      kable_styling() |> 
-      scroll_box(height="220px", width="100%")
-
-waters.new <- read_xlsx(here("data/2021_waters_collection_Turkana_IsoWater.xlsx")) |>
-  mutate(WaterType = str_replace(WaterType, "Ground", "Shallow Ground"))
-# col_types = c("text", "date", rep("text", 3), rep("numeric", 2))
+# Simplify WaterType categories
+waters <- waters.rawdata |>
+  mutate(WaterType = str_replace_all(WaterType, 
+                                     c("River Delta" = "River",
+                                       "Deep Ground" = "Ground",
+                                       "Shallow Ground" = "Ground",
+                                       "Spring" = "Ground",
+                                       "Evaporated Surface" = "Surface")))
 
 ```
 
-### Define plot aesthetics
+#### Define plot aesthetics
 
 Colorblind-friendly palette from @tol2018.
 
 ```{r plot-aesthetics, echo = FALSE}
 theme_set(theme_tufte(base_family = "Helvetica"))
 
-axis.x.max <- max(waters.all$d18O) + 0.5
-axis.x.min <- min(waters.all$d18O) - 0.5
-axis.y.max <- max(waters.all$dD) + 0.5
-axis.y.min <- min(waters.all$dD) - 0.5
+axis.x.max <- max(waters$d18O) + 0.5
+axis.x.min <- min(waters$d18O) - 0.5
+axis.y.max <- max(waters$dD) + 0.5
+axis.y.min <- min(waters$dD) - 0.5
 
 axis.x.label <- expression(paste(delta^{18}, "O (‰ VSMOW)"))
 axis.y.label <- expression(paste(delta, "D (‰ VSMOW)"))
@@ -155,11 +154,60 @@ color.model <- "gray69"
 shape.lake <- 16 # circle
 shape.precip <- 17 # triangle
 shape.river <- 15 # square
-shape.ground.deep <- 7 # x in box
-shape.ground.shallow <- 4 # x
-shape.surface.evap <- 5 # diamond empty
+shape.ground <- 7 # x in box
+shape.surface <- 5 # diamond empty
 shape.surface.lake <- 1 # circle empty
 shape.model <- 3 # cross 
+```
+
+### Data only
+
+```{r newplot, echo = FALSE}
+
+# Highlight 2021 data 
+plot.waters.2021 <- ggplot() +
+  geom_point(data = waters |>
+               filter(Date > "2021-01-01"),
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType)) +
+  geom_point(data = waters |>
+               filter(Date < "2021-01-01"),
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), alpha = 0.3) +
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL"), show.legend = FALSE) +
+  
+  labs(x = axis.x.label, 
+       y = axis.y.label) +
+  
+    # legend
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground", "GMWL"), 
+    # set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Ground" = shape.ground,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground", "GMWL"), 
+    # set plot element colors
+    values = c(
+      "Lake" = color.lake,
+      "Restricted Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Surface" = color.surface,
+      "Ground" = color.ground,
+      "GMWL" = color.GMWL)) +
+  
+  guides(color = guide_legend(override.aes=list(
+    linetype = c(rep("blank", 6), "solid"),
+    shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.ground, NA),
+    size = 2))) 
+
+plot(plot.waters.2021)
 ```
 
 ### Model with meteoric waters

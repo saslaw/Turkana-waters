@@ -1,3 +1,4 @@
+# copy-pasting tables together in Excel proved more efficient than combining all sources in R, but the `conv_unit()` piece here works, for future reference
 
 pacman::p_load(here, readxl, tidyverse, measurements)
 
@@ -13,11 +14,4 @@ waters.collection.min <- waters.collection |>
   mutate(Longitude = conv_unit(Long.min, from = 'deg_dec_min', to = 'dec_deg')) |>
   select(-Lat.min, -Long.min)
 
-waters.collection.deg <- waters.collection |>
-  filter(Date > "2021-07-10")
 
-# produce csv and use Excel to round converted decimals (lazy path for now)
-waters.collection <- rbind(waters.collection.min, waters.collection.deg)
-write.csv(waters.collection, here("data/2021_waters_collection.csv"))
-
-# re-import csv and add results
