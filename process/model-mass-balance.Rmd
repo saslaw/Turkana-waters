@@ -122,6 +122,11 @@ kable(waters.all |>
       format="html") |> 
       kable_styling() |> 
       scroll_box(height="220px", width="100%")
+
+waters.new <- read_xlsx(here("data/2021_waters_collection_Turkana_IsoWater.xlsx")) |>
+  mutate(WaterType = str_replace(WaterType, "Ground", "Shallow Ground"))
+# col_types = c("text", "date", rep("text", 3), rep("numeric", 2))
+
 ```
 
 ### Define plot aesthetics
@@ -231,6 +236,7 @@ Like this?
 ```{r plot-all, echo = FALSE}
 plot.all <- ggplot(data = waters.all, aes(x = d18O, y = dD, shape = WaterType, color = WaterType), show.legend = FALSE) +
   geom_point() +
+  geom_point(data = waters.new, aes(x = "Calibrated d18O Mean", y = "Calibrated d2H Mean", shape = WaterType, color = WaterType), size = 3, show.legend = FALSE) +
   geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
 
   # legend
