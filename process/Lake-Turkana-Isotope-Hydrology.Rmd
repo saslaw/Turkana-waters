@@ -1,5 +1,5 @@
 ---
-title: "Lake water evaporation model and mass balance calculations for Lake Turkana, Kenya"
+title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
 date: 2022-01-04
 output: 
   html_document: 
@@ -13,7 +13,7 @@ reference-section-title: "References"
 
 ```{r, setup, echo = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes)
+pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, kableExtra)
 ```
 
 # Water isotope measurements
@@ -136,9 +136,9 @@ plot.waters.2021 <- ggplot() +
 plot(plot.waters.2021)
 ```
 
-### Load and process published data (@levin2009)
+### Load and process published data (Levin et al 2009)
 
-This data set includes measurements from the Ethiopian plateau, and other points outside of Turkana. Filter to Turkana data only using coordiantes, if necessary. 
+This data set (@levin2009) includes measurements from the Ethiopian plateau, and other points outside of Turkana.  
 
 ```{r read-Levin, message = FALSE}
 waters.Levin.rawdata <- read_excel(here("data/Levin_et_al_2009_raw_data.xls"))
@@ -208,9 +208,7 @@ plot(plot.waters.inclusive)
 
 ## Summary values
 
-Identify measured values that affect model inputs.
-
-```{r summary-data}
+```{r summary-data, echo = FALSE}
 waters.summary <- waters |>
   group_by(WaterType) |>
   summarize(d18O_mean = mean(d18O),
@@ -227,11 +225,9 @@ waters.summary.Levin <- waters.Levin |>
             dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
   mutate(Source = "Levin et al 2009")
 
-waters.summary <- rbind(waters.summary, waters.summary.Levin)
-
 Omo.River <- waters.Levin |>
   filter(grepl("Omo River", Sampling_Location_and_Notes)) |>
-  # group_by(WaterType) |>
+  # group_by(Sampling_Location_and_Notes) |>
   # summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
   #           d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
   #           dD_mean = mean(dD_VSMOW, na.rm = TRUE),
@@ -240,7 +236,20 @@ Omo.River <- waters.Levin |>
 
 mean.surface.TC <- mean(waters$SurfaceTempC, na.rm = TRUE)
 mean.rh <- 0.33 # From TBI-Ileret PurpleAir sensor lifetime average
+
+waters.summary <- rbind(waters.summary, waters.summary.Levin) |>
+  mutate(d18O_mean = round(d18O_mean, 2),
+         d18O_stdv = round(d18O_stdv, 2),
+         dD_mean = round(dD_mean, 2),
+         dD_stdv = round(dD_stdv, 2)) 
+
+waters.summary |>
+  arrange(WaterType) |>
+  kbl() |>
+  kable_styling()
+
 ```
+
 # Local evaporation line model
 
 ## Define model function
