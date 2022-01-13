@@ -1,10 +1,10 @@
 ---
 title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
-date: 2022-01-04
+date: 2022-01-13
 output: 
-  html_document: 
-    highlight: monochrome
   html_notebook: 
+    highlight: monochrome
+  html_document: 
     highlight: monochrome
 editor_options: 
   chunk_output_type: inline
@@ -20,11 +20,10 @@ pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, kableExtra)
 
 ## Data visualization
 
-### Define plot styles 
-
-Colorblind-friendly palette from @tol2018.
-
 ```{r plot-styles, echo = FALSE}
+# Plot styles 
+# Colorblind-friendly palette from @tol2018.
+
 theme_set(theme_tufte(base_family = "Helvetica") +
             theme(
               panel.background = element_rect(fill = 'white'), 
@@ -57,6 +56,11 @@ color.surface <- "#CCBB44"
 color.GMWL <- "gray19"
 color.model <- "gray69"
 
+color.scenario1 <- "#DDCC77"
+color.scenario2 <- "#CC6677"
+color.scenario3 <- "#882255"
+color.scenario4 <- "#AA4499"
+
 shape.lake <- 16 # circle
 shape.precip <- 17 # triangle
 shape.river <- 15 # square
@@ -70,43 +74,42 @@ size.sm <- 1
 size.lg <- 5
 ```
 
-### Load and process data (this study)
+```{r read-newdata, echo = FALSE, message = FALSE}
+# Load and process data (this study)
 
-```{r read-newdata, message = FALSE}
-waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"))
-
-# Simplify WaterType categories
+waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"), show_col_types = FALSE)
 waters <- waters.rawdata |>
+  # Simplify WaterType categories
   mutate(WaterType = str_replace_all(WaterType, 
                                      c("River Delta" = "River",
                                        "Deep Ground" = "Ground",
                                        "Shallow Ground" = "Ground",
                                        "Spring" = "Ground",
-                                       "Evaporated Surface" = "Surface")))
+                                       "Evaporated Surface" = "Surface"))) 
 ```
 
 ### New measurements
 
 ```{r plot-newdata, echo = FALSE}
-# Highlight 2021 data using lower alpha for older samples 
-plot.waters.2021 <- ggplot() +
+
+plot.newdata <- ggplot() +
   
-  geom_point(data = waters |>
-               filter(Date > "2021-01-01"),
+  # Use lower alpha for older samples 
+  # geom_point(data = waters |>
+  #              filter(Date < "2021-01-01"),
+  #           aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st, alpha = 0.4) +
+
+  geom_point(data = waters,
              aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st) +
-  geom_point(data = waters |>
-               filter(Date < "2021-01-01"),
-             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st, alpha = 0.4) +
-  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
+    geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
   
   labs(x = axis.x.label, 
-       y = axis.y.label,
-       caption = "Data from 2021 field season is darker; 2016-2020 data is lighter") +
+       y = axis.y.label) +
   
-    # legend
+  # Legend
   scale_shape_manual(
     breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground", "GMWL"), 
-    # set plot element shapes
+    # Set plot element shapes
     values = c(
       "Lake" = shape.lake,
       "Restricted Lake" = shape.surface.lake,
@@ -115,10 +118,9 @@ plot.waters.2021 <- ggplot() +
       "Surface" = shape.surface,
       "Ground" = shape.ground,
       "GMWL" = 1)) +
-  
   scale_color_manual(
     breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground", "GMWL"), 
-    # set plot element colors
+    # Set plot element colors
     values = c(
       "Lake" = color.lake,
       "Restricted Lake" = color.lake,
@@ -128,12 +130,13 @@ plot.waters.2021 <- ggplot() +
       "Ground" = color.ground,
       "GMWL" = color.GMWL)) +
   
-  guides(color = guide_legend(override.aes=list(
-    linetype = c(rep("blank", 6), "solid"),
-    shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.ground, NA),
-    size = 2))) 
+  guides(color = guide_legend(title = "Water type",
+                              override.aes=list(
+                                linetype = c(rep("blank", 6), "solid"),
+                                shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.ground, NA),
+                                size = 2))) 
 
-plot(plot.waters.2021)
+plot(plot.newdata)
 ```
 
 ### Load and process published data (Levin et al 2009)
@@ -144,6 +147,7 @@ This data set (@levin2009) includes measurements from the Ethiopian plateau, and
 waters.Levin.rawdata <- read_excel(here("data/Levin_et_al_2009_raw_data.xls"))
 
 # Make WaterType categories consistent with this study
+# Filter arid latitudes 
 waters.Levin <- waters.Levin.rawdata |>
   mutate(WaterType = str_replace_all(Type, 
                                      c("spring" = "Ground",
@@ -153,7 +157,8 @@ waters.Levin <- waters.Levin.rawdata |>
                                        "tap" = "Ground",
                                        "stream" = "Surface",
                                        "well" = "Ground",
-                                       "rain" = "Precipitation")))
+                                       "rain" = "Precipitation"))) |>
+  filter(between(Lat, 2, 5.1))
 ```
 
 ### Published measurements
@@ -254,7 +259,9 @@ waters.summary |>
 
 ## Define model function
 
-The function produces a plot-able data frame of δ^18^O and δD values representing isotope composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined in @gibson2016 and @horita1994.
+**Copied to `evaporation-model.R` script for use in interactive / publication version.**
+
+The function produces a plot-able data frame of d18O and dD values representing isotope composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined in @gibson2016 and @horita1994.
 
 ```{r define-model}
 model.LEL <- function(env.input){
@@ -319,17 +326,17 @@ Build model evaporation lines using environmental conditions, starting with a si
 env.conditions <- c(
   
   # average air temperature (C); evaporation model is most accurate given an air-water interface temperature 
-  "TC" = 28,
+  "TC" = 30,
   
   # average humidity (%rh); evaporation model is most accurate given a value normalized to water surface temperature
   "rh" = 0.25,
   
   # d18O & dD (permil VSMOW) for lake water input 
-  "d18Oi" = -0.4,
-  "dDi"   = 9,
+  "d18Oi" = -1,
+  "dDi"   = 5,
   
   # d18O & dD (permil VSMOW) for precipitation
-  "d18Op" = 0.9,
+  "d18Op" = 0,
   "dDp"   = 10,
   
   # degree to which there is isotopic equilibrium between precipitation and atmospheric water vapor
@@ -345,29 +352,55 @@ Apply the model over a range of scenarios, varying different inputs.
 *How do we use co-varying d18O & dD values that make sense together?*
 
 ```{r model-inputs-vary}
-# Produce lists of incremental values 
-# length of 6 provides 6 rows for a table of inputs, 6 plots for a panel
-seq.length <- 6
-
-vary.TC <- seq(from = 20, to = 40, length.out = seq.length)
-vary.rh <- seq(from = 0.1, to = 0.6, length.out = seq.length)
-vary.d18Oi <- seq(from = -3.5, to = 1.5, length.out = seq.length)
-vary.dDi <- seq(from = -30, to = 20, length.out = seq.length)
-vary.d18Op <- seq(from = -3, to = 6, length.out = seq.length)
-vary.dDp <- seq(from = -30, to = 40, length.out = seq.length)
-vary.k <- seq(from = 0, to = 1, length.out = seq.length)
+# Variable temperatures
+LEL1 <- model.LEL(c(
+  "TC" = 25, 
+  "rh" = 0.25, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "25C")
+LEL2 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.25, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0.1, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "30C") 
+LEL3 <- model.LEL(c(
+  "TC" = 35, 
+  "rh" = 0.25, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "35C")
+LEL4 <- model.LEL(c(
+  "TC" = 40, 
+  "rh" = 0.25, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "40C")
+vary.TC <- rbind(LEL1, LEL2, LEL3, LEL4)
 
 ```
 
 ### Model with meteoric waters
-
-Single plot, LEL for environmental conditions: `r paste(names(env.conditions), "=", env.conditions, collapse=", ")`
 
 ```{r LEL-meteoric}
 # Filter meteoric waters (all types except ground)
 waters.meteoric <- waters |>
   filter(WaterType != "Ground")
 
+# Single plot
 plot.LEL <- ggplot(data = result.LEL, aes(x = d18O, y = dD, color = "Modeled LEL")) +
   
   # plot elements
@@ -411,6 +444,96 @@ plot.LEL <- ggplot(data = result.LEL, aes(x = d18O, y = dD, color = "Modeled LEL
        caption = paste(names(env.conditions), "=", env.conditions, collapse = ", "))
 
 plot(plot.LEL)
+
+# overlayed scenarios  
+scenario.LEL <- ggplot(data = vary.TC, aes(x = d18O, y = dD, color = Scenario)) +
+  
+  # plot elements
+  geom_point(shape = shape.model) + geom_line() +
+  geom_point(data = waters.meteoric,
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st, show.legend = FALSE) +
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL"), show.legend = FALSE) +
+  
+  # legend
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"), 
+    # set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Modeled LEL" = shape.model,
+      "GMWL" = 1)) +
+  
+  # scale_color_manual(
+  #   breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"), 
+  #   # set plot element colors
+  #   values = c(
+  #     "Lake" = color.lake,
+  #     "Restricted Lake" = color.lake,
+  #     "River" = color.river,
+  #     "Precipitation" = color.precip,
+  #     "Surface" = color.surface,
+  #     "Modeled LEL" = color.model,
+  #     "GMWL" = color.GMWL)) +
+  # 
+  # guides(color = guide_legend(override.aes=list(
+  #   linetype = c(rep("blank", 5), rep("solid", 2)),
+  #   shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.model, NA),
+  #   size = 2))) +
+  
+  labs(x = axis.x.label, 
+       y = axis.y.label) 
+
+plot(scenario.LEL)
+
+# panel scenarios  
+panel.LEL <- ggplot(data = vary.TC, aes(x = d18O, y = dD)) +
+  
+  # plot elements
+  geom_point(shape = shape.model) + geom_line() +
+  geom_point(data = waters.meteoric,
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st, show.legend = FALSE) +
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL"), show.legend = FALSE) +
+  
+  # legend
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"), 
+    # set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Modeled LEL" = shape.model,
+      "GMWL" = 1)) +
+  
+  # scale_color_manual(
+  #   breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"), 
+  #   # set plot element colors
+  #   values = c(
+  #     "Lake" = color.lake,
+  #     "Restricted Lake" = color.lake,
+  #     "River" = color.river,
+  #     "Precipitation" = color.precip,
+  #     "Surface" = color.surface,
+  #     "Modeled LEL" = color.model,
+  #     "GMWL" = color.GMWL)) +
+  # 
+  # guides(color = guide_legend(override.aes=list(
+  #   linetype = c(rep("blank", 5), rep("solid", 2)),
+  #   shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.model, NA),
+  #   size = 2))) +
+  
+  labs(x = axis.x.label, 
+       y = axis.y.label) +
+
+  facet_grid(.~Scenario)          
+
+plot(panel.LEL)
 ```
 
 *To do:* Generate a 4 or 6 panel figure with four sets of input values. Use `apply()` for this? 
