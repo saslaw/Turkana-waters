@@ -1,10 +1,10 @@
 ---
 title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
-date: 2022-01-13
+date: 2022-01-15
 output: 
-  html_notebook: 
-    highlight: monochrome
   html_document: 
+    highlight: monochrome
+  html_notebook: 
     highlight: monochrome
 editor_options: 
   chunk_output_type: inline
@@ -13,7 +13,7 @@ reference-section-title: "References"
 
 ```{r, setup, echo = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, kableExtra)
+pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, ggrepel, kableExtra)
 ```
 
 # Water isotope measurements
@@ -204,6 +204,8 @@ waters.summary |>
 
 ```
 
+*To do:* Look for seasonality 
+
 # Local evaporation line model
 
 ## Define model function
@@ -294,7 +296,7 @@ result.LEL <- model.LEL(env.conditions)
 ```
 
 ```{r model-inputs-vary}
-# Variable temperatures
+# Variable temperatures ----
 LEL1 <- model.LEL(c(
   "TC" = 25, 
   "rh" = 0.25, 
@@ -333,12 +335,90 @@ LEL4 <- model.LEL(c(
   mutate(Scenario = "40C")
 vary.TC <- rbind(LEL1, LEL2, LEL3, LEL4)
 
+# Variable rh ----
+LEL1 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.20, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "20% rh")
+LEL2 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.35, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0.1, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "35% rh") 
+LEL3 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.5, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "50% rh")
+LEL4 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.65, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "65% rh")
+vary.rh <- rbind(LEL1, LEL2, LEL3, LEL4)
+
+# Variable k ----
+LEL1 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.35, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.1)) |>
+  mutate(Scenario = "0.1")
+LEL2 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.35, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0.1, 
+  "dDp" = 10, 
+  "k" = 0.3)) |>
+  mutate(Scenario = "0.3") 
+LEL3 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.35, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.5)) |>
+  mutate(Scenario = "0.5")
+LEL4 <- model.LEL(c(
+  "TC" = 30, 
+  "rh" = 0.35, 
+  "d18Oi" = -1, 
+  "dDi" = 5, 
+  "d18Op" = 0, 
+  "dDp" = 10, 
+  "k" = 0.7)) |>
+  mutate(Scenario = "0.7")
+vary.k <- rbind(LEL1, LEL2, LEL3, LEL4)
 ```
 
 ### Model with meteoric waters
-```{r plot-overlayed-scenarios, warning = FALSE}
+```{r plot-overlayed-scenarios, echo = FALSE, warning=FALSE}
 # Multiple scenarios on one plot  
 
+# Variable temperature ----
 scenario.TC <- ggplot(data = vary.TC, aes(x = d18O, y = dD, color = Scenario)) +
   
   # Plot elements
@@ -379,6 +459,7 @@ scenario.TC <- ggplot(data = vary.TC, aes(x = d18O, y = dD, color = Scenario)) +
       "GMWL" = color.GMWL)) +
   
   labs(title = "Variable temperature",
+       subtitle = "25% rh, k = 0.1", 
        x = axis.x.label, 
        y = axis.y.label) +
   
@@ -386,6 +467,106 @@ scenario.TC <- ggplot(data = vary.TC, aes(x = d18O, y = dD, color = Scenario)) +
        y = c(-30, 60))
 
 plot(scenario.TC)
+
+# Variable rh ----
+scenario.rh <- ggplot(data = vary.rh, aes(x = d18O, y = dD, color = Scenario)) +
+  
+  # Plot elements
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
+  geom_point(data = waters.meteoric,
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st) +
+  geom_point(shape = shape.model, show.legend = FALSE) + geom_line(show.legend = FALSE) + 
+  geom_label_repel(data = vary.rh |>
+                   filter(between(d18O, 9, 10.2)),
+             aes(label = Scenario)) +
+  
+  # Legend
+  theme(legend.position = "none") +
+
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"),
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Modeled LEL" = shape.model,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "20% rh", "35% rh", "50% rh", "65% rh", "30C", "35C", "40C", "GMWL"),
+    values = c(
+      "Lake" = color.lake,
+      "Restricted Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Surface" = color.surface,
+      "20% rh" = color.scenario1,
+      "35% rh" = color.scenario2,
+      "50% rh" = color.scenario3,
+      "65% rh" = color.scenario4,
+      "GMWL" = color.GMWL)) +
+  
+  labs(title = "Variable humidity",
+       subtitle = "30C, k = 0.1", 
+       x = axis.x.label, 
+       y = axis.y.label) +
+  
+  lims(x = c(-5, 12),
+       y = c(-30, 60))
+
+plot(scenario.rh)
+
+# Variable k ----
+scenario.k <- ggplot(data = vary.k, aes(x = d18O, y = dD, color = Scenario)) +
+  
+  # Plot elements
+  geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
+  geom_point(data = waters.meteoric,
+             aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st) +
+  geom_point(shape = shape.model) + geom_line() + 
+  geom_label_repel(data = vary.k |>
+                   filter(between(d18O, 9, 10)),
+             aes(label = Scenario)) +
+  
+  # Legend
+  theme(legend.position = "none") +
+
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Modeled LEL", "GMWL"),
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Modeled LEL" = shape.model,
+      "GMWL" = 1)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "0.1", "0.3", "0.5", "0.7", "GMWL"),
+    values = c(
+      "Lake" = color.lake,
+      "Restricted Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Surface" = color.surface,
+      "0.1" = color.scenario1,
+      "0.3" = color.scenario2,
+      "0.5" = color.scenario3,
+      "0.7" = color.scenario4,
+      "GMWL" = color.GMWL)) +
+  
+  labs(title = "Variable k",
+       subtitle = "30C, 35% rh", 
+       x = axis.x.label, 
+       y = axis.y.label) +
+  
+  lims(x = c(-5, 12),
+       y = c(-30, 60))
+
+plot(scenario.k)
 ```
 
 ```{r plot-LEL-extra, echo = FALSE, include = FALSE}
@@ -482,6 +663,10 @@ plot(panel.LEL)
 ```
 
 ### Test models
+
+- Is the best model the one that best fits the lake data? 
+- Regress lake only
+- Compare models with lake regression 
 
 ## Mass balance
 
