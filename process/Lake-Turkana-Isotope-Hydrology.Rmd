@@ -412,6 +412,26 @@ LEL4 <- model.LEL(c(
   "k" = 0.7)) |>
   mutate(Scenario = "0.7")
 vary.k <- rbind(LEL1, LEL2, LEL3, LEL4)
+
+# New for loop method ----
+TC_v = c(25, 30, 35, 40)
+k_v = c(0.1,0.3,0.5,0.7)
+rh_v = c(0.2,0.35,0.5,0.65)
+
+var_k = NULL
+for (nn in 1:4){
+  this.LEL = model.LEL(c(
+    "TC" = 30,
+    "rh" = .25,
+    "d18Oi" = -1,
+    "dDi" = 5,
+    "d18Op" = 0,
+    "dDp" = 10,
+    "k" = k_v[nn])) |>
+    mutate(Scenario = as.character(k_v[nn]))
+  var_k <- rbind(var_k,this.LEL)
+}
+
 ```
 
 ### Model with meteoric waters
@@ -495,7 +515,7 @@ scenario.rh <- ggplot(data = vary.rh, aes(x = d18O, y = dD, color = Scenario)) +
       "GMWL" = 1)) +
   
   scale_color_manual(
-    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "20% rh", "35% rh", "50% rh", "65% rh", "30C", "35C", "40C", "GMWL"),
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "20% rh", "35% rh", "50% rh", "65% rh", "GMWL"),
     values = c(
       "Lake" = color.lake,
       "Restricted Lake" = color.lake,
