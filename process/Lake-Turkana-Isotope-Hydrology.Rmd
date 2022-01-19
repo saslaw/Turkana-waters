@@ -13,7 +13,7 @@ reference-section-title: "References"
 
 ```{r, setup, echo = FALSE, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, ggrepel, kableExtra)
+pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, ggrepel, patchwork, kableExtra)
 ```
 
 # Water isotope measurements
@@ -296,129 +296,40 @@ result.LEL <- model.LEL(env.conditions)
 ```
 
 ```{r model-inputs-vary}
-# Variable temperatures ----
-LEL1 <- model.LEL(c(
-  "TC" = 25, 
-  "rh" = 0.25, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "25C")
-LEL2 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.25, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0.1, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "30C") 
-LEL3 <- model.LEL(c(
-  "TC" = 35, 
-  "rh" = 0.25, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "35C")
-LEL4 <- model.LEL(c(
-  "TC" = 40, 
-  "rh" = 0.25, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "40C")
-vary.TC <- rbind(LEL1, LEL2, LEL3, LEL4)
+# Create model scenarios for each variable
+values.TC = c(25, 30, 35, 40)
+values.rh = c(0.2, 0.35, 0.5, 0.65)
+values.k = c(0.1, 0.3, 0.5, 0.7)
 
-# Variable rh ----
-LEL1 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.20, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "20% rh")
-LEL2 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.35, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0.1, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "35% rh") 
-LEL3 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.5, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "50% rh")
-LEL4 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.65, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "65% rh")
-vary.rh <- rbind(LEL1, LEL2, LEL3, LEL4)
+vary.TC = NULL
+for (nn in 1:4){
+  this.LEL = model.LEL(c(
+    "TC" = values.TC[nn],
+    "rh" = .25,
+    "d18Oi" = -1,
+    "dDi" = 5,
+    "d18Op" = 0,
+    "dDp" = 10,
+    "k" = 0.1)) |>
+    mutate(Scenario = as.character(values.TC[nn]))
+  vary.TC <- rbind(vary.TC, this.LEL)
+}
 
-# Variable k ----
-LEL1 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.35, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.1)) |>
-  mutate(Scenario = "0.1")
-LEL2 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.35, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0.1, 
-  "dDp" = 10, 
-  "k" = 0.3)) |>
-  mutate(Scenario = "0.3") 
-LEL3 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.35, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.5)) |>
-  mutate(Scenario = "0.5")
-LEL4 <- model.LEL(c(
-  "TC" = 30, 
-  "rh" = 0.35, 
-  "d18Oi" = -1, 
-  "dDi" = 5, 
-  "d18Op" = 0, 
-  "dDp" = 10, 
-  "k" = 0.7)) |>
-  mutate(Scenario = "0.7")
-vary.k <- rbind(LEL1, LEL2, LEL3, LEL4)
+vary.rh = NULL
+for (nn in 1:4){
+  this.LEL = model.LEL(c(
+    "TC" = 30,
+    "rh" = values.rh[nn],
+    "d18Oi" = -1,
+    "dDi" = 5,
+    "d18Op" = 0,
+    "dDp" = 10,
+    "k" = 0.1)) |>
+    mutate(Scenario = as.character(values.rh[nn]))
+  vary.rh <- rbind(vary.rh, this.LEL)
+}
 
-# New for loop method ----
-TC_v = c(25, 30, 35, 40)
-k_v = c(0.1,0.3,0.5,0.7)
-rh_v = c(0.2,0.35,0.5,0.65)
-
-var_k = NULL
+vary.k = NULL
 for (nn in 1:4){
   this.LEL = model.LEL(c(
     "TC" = 30,
@@ -427,11 +338,10 @@ for (nn in 1:4){
     "dDi" = 5,
     "d18Op" = 0,
     "dDp" = 10,
-    "k" = k_v[nn])) |>
-    mutate(Scenario = as.character(k_v[nn]))
-  var_k <- rbind(var_k,this.LEL)
+    "k" = values.k[nn])) |>
+    mutate(Scenario = as.character(values.k[nn]))
+  vary.k <- rbind(vary.k, this.LEL)
 }
-
 ```
 
 ### Model with meteoric waters
