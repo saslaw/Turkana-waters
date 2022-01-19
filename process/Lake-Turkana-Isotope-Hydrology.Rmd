@@ -2,9 +2,9 @@
 title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
 date: 2022-01-15
 output: 
-  html_document: 
-    highlight: monochrome
   html_notebook: 
+    highlight: monochrome
+  html_document: 
     highlight: monochrome
 editor_options: 
   chunk_output_type: inline
@@ -684,9 +684,16 @@ plot(panel.LEL)
 
 ### Test models
 
+Set k = 0.1, equilibrium between precip and vapor above the lake is probably low because vapor isotope composition reflects evaporated lake water, not precip signal, Changing k has little effect on model slope. 
+
+Set TC = 30, close to mean of 11 measured surface temperatures and close to recorded MAAT. Temperature also has little effect on model slope. 
+
 - Is the best model the one that best fits the lake data? 
 - Regress lake only
-- Compare models with lake regression 
+- Compare models with lake regression
+- Quantify effect of each atmospheric variable on model — how? 
+
+
 
 ## Mass balance
 
