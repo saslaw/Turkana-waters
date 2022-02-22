@@ -1,6 +1,6 @@
 ---
 title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
-date: 2022-01-15
+date: 2022-02-10
 output: 
   html_notebook: 
     highlight: monochrome
@@ -15,10 +15,6 @@ reference-section-title: "References"
 knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(here, knitr, tidyverse, readxl, lubridate, ggthemes, ggrepel, patchwork, kableExtra)
 ```
-
-# Water isotope measurements
-
-## Data visualization
 
 ```{r plot-styles, echo = FALSE}
 # Plot styles 
@@ -75,10 +71,13 @@ size.sm <- 1
 size.lg <- 5
 ```
 
+# Water isotope measurements
+
+## Data presentation
+
 ```{r data-processing, echo = FALSE, message = FALSE}
 # Load and process data (this study)
-
-waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"), show_col_types = FALSE)
+waters.rawdata <- read_csv(here("Turkana-waters/data/2016-2021_waters.csv"), show_col_types = FALSE)
 waters <- waters.rawdata |>
   # Simplify WaterType categories
   mutate(WaterType = str_replace_all(WaterType, 
@@ -89,8 +88,7 @@ waters <- waters.rawdata |>
                                        "Evaporated Surface" = "Surface"))) 
 
 # Load and process data (Levin et al 2009)
-waters.Levin.rawdata <- read_excel(here("data/Levin_et_al_2009_raw_data.xls"))
-
+waters.Levin.rawdata <- read_excel(here("Turkana-waters/data/Levin_et_al_2009_raw_data.xls"))
 waters.Levin <- waters.Levin.rawdata |>
   # Make WaterType categories consistent with this study
   mutate(WaterType = str_replace_all(Type, 
@@ -110,6 +108,47 @@ waters.Levin <- waters.Levin.rawdata |>
 waters.meteoric <- waters |>
   filter(WaterType != "Ground")
 ```
+
+### Figure 1. Sample location map
+
+```{r sample-map, echo = FALSE, message = FALSE, warning = FALSE}
+# Load maps 
+source(here("Turkana-maps/scripts/Turkana-base-map.R"))
+
+# Add data
+fig1A <- map.Turkana + 
+  geom_point(data = waters,
+             aes(x = Longitude, y = Latitude, color = WaterType, shape = WaterType), size = size.st) +
+  
+  # Legend
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground"), 
+    # Set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface,
+      "Ground" = shape.ground)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground"), 
+    # Set plot element colors
+    values = c(
+      "Lake" = color.lake,
+      "Restricted Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Surface" = color.surface,
+      "Ground" = color.ground))
+
+fig1 <- fig1A | map.context
+plot(fig1)
+```
+### Table 1. New measurements
+
+### Figure 2. Water isotope plot 
 
 ```{r plot-data, echo = FALSE, warning = FALSE}
 plot.waters <- ggplot() +
@@ -159,6 +198,8 @@ plot.waters <- ggplot() +
 
 plot(plot.waters)
 ```
+
+### Figure 3. Time series plots
 
 ## Summary values
 
