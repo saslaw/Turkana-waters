@@ -1,6 +1,6 @@
 ---
 title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
-date: 2022-02-10
+date: 2022-03-05
 output: 
   html_notebook: 
     highlight: monochrome
@@ -73,8 +73,6 @@ size.lg <- 5
 
 # Water isotope measurements
 
-## Data presentation
-
 ```{r data-processing, echo = FALSE, message = FALSE}
 # Load and process data (this study)
 waters.rawdata <- read_csv(here("Turkana-waters/data/2016-2021_waters.csv"), show_col_types = FALSE)
@@ -103,15 +101,11 @@ waters.Levin <- waters.Levin.rawdata |>
   # Filter arid latitudes 
   filter(between(Lat, 2, 5.1))
 
-# Filter meteoric waters (all types except ground)
-# This study only
-waters.meteoric <- waters |>
-  filter(WaterType != "Ground")
 ```
 
-### Figure 1. Sample location map
+## Figure 1. Sample location map
 
-```{r sample-map, echo = FALSE, message = FALSE, warning = FALSE}
+```{r figure1, echo = FALSE, message = FALSE, warning = FALSE}
 # Load maps 
 source(here("Turkana-maps/scripts/Turkana-base-map.R"))
 
@@ -143,15 +137,73 @@ fig1A <- map.Turkana +
       "Surface" = color.surface,
       "Ground" = color.ground))
 
-fig1 <- fig1A | map.context
-plot(fig1)
+fig1A + map.context +
+  plot_layout(ncol = 2, widths = c(2,1))
+
+# save figures for formatting
+
 ```
-### Table 1. New measurements
 
-### Figure 2. Water isotope plot 
 
-```{r plot-data, echo = FALSE, warning = FALSE}
-plot.waters <- ggplot() +
+## Table 1. New measurements
+
+```{r table1, echo = FALSE, message = FALSE, warning = FALSE}
+tbl1 <- waters |>
+  dplyr::select(SampleID, Date, Latitude, Longitude, Location, WaterType, d18O, dD, Dexcess) 
+tbl1
+
+# save Table 1 for Word
+#write.csv(tbl1, here("Turkana-waters/figures-tables/Table1.csv"))
+```
+
+### Summary values
+
+Data from Levin et al filtered to latitudes between 2 — 5.1°
+
+```{r summary-data, echo = FALSE}
+# Filter meteoric waters (all types except ground)
+# This study only
+waters.meteoric <- waters |>
+  filter(WaterType != "Ground")
+
+waters.summary <- waters |>
+  group_by(WaterType) |>
+  summarize(d18O_mean = mean(d18O),
+            d18O_stdv = sd(d18O),
+            dD_mean = mean(dD),
+            dD_stdv = sd(dD)) |>
+  mutate(Source = "this study")
+
+waters.summary.Levin <- waters.Levin |>
+  group_by(WaterType) |>
+  summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
+            d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
+            dD_mean = mean(dD_VSMOW, na.rm = TRUE),
+            dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
+  mutate(Source = "Levin et al 2009")
+
+Omo.River <- waters.Levin |>
+  filter(grepl("Omo River", Sampling_Location_and_Notes)) |>
+  mutate(Source = "Levin et al 2009")
+
+mean.surface.TC <- mean(waters$SurfaceTempC, na.rm = TRUE)
+mean.rh <- 0.33 # From TBI-Ileret PurpleAir sensor lifetime average
+
+waters.summary <- rbind(waters.summary, waters.summary.Levin) |>
+  mutate(d18O_mean = round(d18O_mean, 2),
+         d18O_stdv = round(d18O_stdv, 2),
+         dD_mean = round(dD_mean, 2),
+         dD_stdv = round(dD_stdv, 2)) 
+
+waters.summary |>
+  arrange(desc(Source)) 
+
+```
+
+## Figure 2. Water isotope plot 
+
+```{r figure2, echo = FALSE, warning = FALSE}
+fig2 <- ggplot() +
   
   geom_point(data = waters.Levin,
              aes(x = d18O_VSMOW, y = dD_VSMOW, shape = WaterType), size = size.st, color = "gray77", 
@@ -162,7 +214,7 @@ plot.waters <- ggplot() +
   
   labs(x = axis.x.label, 
        y = axis.y.label,
-       caption = "Data from Levin et al 2009 shown in gray") +
+       caption = "Data from Levin et al 2009 (arid latitudes) shown in gray") +
   
   # Legend
   scale_shape_manual(
@@ -196,56 +248,19 @@ plot.waters <- ggplot() +
         shape = c(shape.lake, shape.surface.lake, shape.river, shape.precip, shape.surface, shape.ground, NA),
         size = 2))) 
 
-plot(plot.waters)
-```
+plot(fig2)
 
-### Figure 3. Time series plots
-
-## Summary values
-
-```{r summary-data, echo = FALSE}
-waters.summary <- waters |>
-  group_by(WaterType) |>
-  summarize(d18O_mean = mean(d18O),
-            d18O_stdv = sd(d18O),
-            dD_mean = mean(dD),
-            dD_stdv = sd(dD)) |>
-  mutate(Source = "this study")
-
-waters.summary.Levin <- waters.Levin |>
-  group_by(WaterType) |>
-  summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
-            d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
-            dD_mean = mean(dD_VSMOW, na.rm = TRUE),
-            dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
-  mutate(Source = "Levin et al 2009")
-
-Omo.River <- waters.Levin |>
-  filter(grepl("Omo River", Sampling_Location_and_Notes)) |>
-  # group_by(Sampling_Location_and_Notes) |>
-  # summarize(d18O_mean = mean(d18O_VSMOW, na.rm = TRUE),
-  #           d18O_stdv = sd(d18O_VSMOW, na.rm = TRUE),
-  #           dD_mean = mean(dD_VSMOW, na.rm = TRUE),
-  #           dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
-  mutate(Source = "Levin et al 2009")
-
-mean.surface.TC <- mean(waters$SurfaceTempC, na.rm = TRUE)
-mean.rh <- 0.33 # From TBI-Ileret PurpleAir sensor lifetime average
-
-waters.summary <- rbind(waters.summary, waters.summary.Levin) |>
-  mutate(d18O_mean = round(d18O_mean, 2),
-         d18O_stdv = round(d18O_stdv, 2),
-         dD_mean = round(dD_mean, 2),
-         dD_stdv = round(dD_stdv, 2)) 
-
-waters.summary |>
-  arrange(desc(Source)) |>
-  kbl() |>
-  kable_styling()
+# save figure for formatting
 
 ```
 
-*To do:* Look for seasonality 
+
+## Figure 3. Time series plots
+
+```{r fig2, echo = FALSE, warning = FALSE}
+
+```
+
 
 # Local evaporation line model
 
