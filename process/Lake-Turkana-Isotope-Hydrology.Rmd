@@ -1,14 +1,16 @@
 ---
-title: "Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance"
-date: 2022-03-05
-output: 
-  html_notebook: 
+title: 'Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass
+  balance'
+date: '2022-03-05'
+output:
+  html_notebook:
     highlight: monochrome
-  html_document: 
+  html_document:
     highlight: monochrome
-editor_options: 
+  word_document: default
+editor_options:
   chunk_output_type: inline
-reference-section-title: "References"
+reference-section-title: References
 ---
 
 ```{r, setup, echo = FALSE, include = FALSE}
@@ -71,8 +73,6 @@ size.sm <- 1
 size.lg <- 5
 ```
 
-# Water isotope measurements
-
 ```{r data-processing, echo = FALSE, message = FALSE}
 # Load and process data (this study)
 waters.rawdata <- read_csv(here("Turkana-waters/data/2016-2021_waters.csv"), show_col_types = FALSE)
@@ -101,7 +101,14 @@ waters.Levin <- waters.Levin.rawdata |>
   # Filter arid latitudes 
   filter(between(Lat, 2, 5.1))
 
+# Load lake height data from G-REALM
+lake.height <- read.csv(here("Turkana-waters/data/GREALM_lake_height.csv")) |>
+  mutate(Date = mdy(Date))
+
 ```
+
+
+# Data
 
 ## Figure 1. Sample location map
 
@@ -158,7 +165,7 @@ tbl1
 
 ### Summary values
 
-Data from Levin et al filtered to latitudes between 2 — 5.1°
+Including data from Levin et al for latitudes between 2—5.1° only
 
 ```{r summary-data, echo = FALSE}
 # Filter meteoric waters (all types except ground)
@@ -200,7 +207,7 @@ waters.summary |>
 
 ```
 
-## Figure 2. Water isotope plot 
+## Figure 2. Water isotopes  
 
 ```{r figure2, echo = FALSE, warning = FALSE}
 fig2 <- ggplot() +
@@ -254,13 +261,56 @@ plot(fig2)
 
 ```
 
+## Figure 3. Time series 
 
-## Figure 3. Time series plots
+```{r figure3, echo = FALSE, warning = FALSE}
+fig3A <- ggplot() +
+  
+  geom_point(data = waters.meteoric,
+             aes(x = Date, y = d18O, color = WaterType, shape = WaterType), size = size.st, show.legend = FALSE) +
 
-```{r fig2, echo = FALSE, warning = FALSE}
+  labs(x = NULL,
+       y = axis.x.label,
+       title = "Meteoric waters") +
+  
+  scale_x_date(limits = as.Date(c("2016-01-01", "2021-12-31"))) +
+  
+  # Legend
+  scale_shape_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface"), 
+    # Set plot element shapes
+    values = c(
+      "Lake" = shape.lake,
+      "Restricted Lake" = shape.surface.lake,
+      "River" = shape.river,
+      "Precipitation" = shape.precip,
+      "Surface" = shape.surface)) +
+  
+  scale_color_manual(
+    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface"), 
+    # Set plot element colors
+    values = c(
+      "Lake" = color.lake,
+      "Restricted Lake" = color.lake,
+      "River" = color.river,
+      "Precipitation" = color.precip,
+      "Surface" = color.surface)) 
+
+fig3B <- ggplot() + 
+  geom_line(data = lake.height, aes(x = Date, y = meters.above.sea.level)) + 
+  
+  labs(x = NULL,
+       y = "Meters above sea level",
+       title = "Lake height") +
+  
+  scale_x_date(limits = as.Date(c("2016-01-01", "2021-12-31"))) 
+
+fig3A + fig3B +
+  plot_layout(ncol = 1)
+
+# save figures for formatting
 
 ```
-
 
 # Local evaporation line model
 
