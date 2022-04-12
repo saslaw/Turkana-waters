@@ -1,7 +1,7 @@
 ---
 title: 'Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass
   balance'
-date: '2022-03-16'
+date: '2022-04-12'
 output:
   html_notebook:
     highlight: monochrome
@@ -28,11 +28,11 @@ theme_set(theme_tufte(base_family = "Helvetica") +
               panel.border = element_rect(fill=NA, color = "black", size = 0.5),
               panel.grid = element_line(color = "gray90", size = 0.5),
               plot.background = element_rect(fill='transparent', color = NA),
-              title = element_text(size = 14),
-              axis.title = element_text(size = 14),
-              axis.text = element_text(size = 14),
-              legend.title = element_text(size = 14, face = "bold"),
-              legend.text = element_text(size = 14),
+              title = element_text(size = 12),
+              axis.title = element_text(size = 10),
+              axis.text = element_text(size = 8),
+              legend.title = element_text(size = 10, face = "bold"),
+              legend.text = element_text(size = 10),
               legend.background = element_rect(fill = 'transparent', color = NA), 
               legend.box.background = element_rect(fill = 'transparent', color = NA), 
               legend.position = "right"
@@ -75,7 +75,7 @@ size.lg <- 5
 
 ```{r data-processing, echo = FALSE, message = FALSE}
 # Load and process data (this study)
-waters.rawdata <- read_csv(here("Turkana-waters/data/2016-2021_waters.csv"), show_col_types = FALSE)
+waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"), show_col_types = FALSE)
 waters <- waters.rawdata |>
   # Simplify WaterType categories
   mutate(WaterType = str_replace_all(WaterType, 
@@ -86,7 +86,7 @@ waters <- waters.rawdata |>
                                        "Evaporated Surface" = "Surface"))) 
 
 # Load and process data (Levin et al 2009)
-waters.Levin.rawdata <- read_excel(here("Turkana-waters/data/Levin_et_al_2009_raw_data.xls"))
+waters.Levin.rawdata <- read_excel(here("data/Levin_et_al_2009_raw_data.xls"))
 waters.Levin <- waters.Levin.rawdata |>
   # Make WaterType categories consistent with this study
   mutate(WaterType = str_replace_all(Type, 
@@ -102,7 +102,7 @@ waters.Levin <- waters.Levin.rawdata |>
   filter(between(Lat, 2, 5.1))
 
 # Load lake height data from G-REALM
-lake.height <- read.csv(here("Turkana-waters/data/GREALM_lake_height.csv")) |>
+lake.height <- read.csv(here("data/GREALM_lake_height.csv")) |>
   mutate(Date = mdy(Date))
 
 ```
@@ -160,7 +160,7 @@ tbl1 <- waters |>
 tbl1
 
 # save Table 1 for Word
-#write.csv(tbl1, here("Turkana-waters/figures-tables/Table1.csv"))
+#write.csv(tbl1, here("figures-tables/Table1.csv"))
 ```
 
 ### Summary values
@@ -188,6 +188,7 @@ waters.summary.Levin <- waters.Levin |>
             dD_mean = mean(dD_VSMOW, na.rm = TRUE),
             dD_stdv = sd(dD_VSMOW, na.rm = TRUE)) |>
   mutate(Source = "Levin et al 2009")
+# n.b. eight samples are missing dD values and will produce a warning for plots
 
 Omo.River <- waters.Levin |>
   filter(grepl("Omo River", Sampling_Location_and_Notes)) |>
@@ -221,6 +222,7 @@ fig2 <- ggplot() +
   
   labs(x = axis.x.label, 
        y = axis.y.label,
+       color = "Water Type",
        caption = "Data from Levin et al 2009 (arid latitudes) shown in gray") +
   
   # Legend
@@ -234,7 +236,8 @@ fig2 <- ggplot() +
       "Precipitation" = shape.precip,
       "Surface" = shape.surface,
       "Ground" = shape.ground,
-      "GMWL" = 1)) +
+      "GMWL" = 1),
+    guide = "none") +
   
   scale_color_manual(
     breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface", "Ground", "GMWL"), 
@@ -258,7 +261,7 @@ fig2 <- ggplot() +
 plot(fig2)
 
 # save figure for formatting
-
+# ggsave(here("figures-tables/Figure2.eps"), fig2, "eps")
 ```
 
 ## Figure 3. Time series 
@@ -269,34 +272,13 @@ Zoom time series to lake samples (except three anomalies) only
 fig3A <- ggplot() +
   
   geom_point(data = waters.meteoric |> filter(WaterType == "Lake"),
-             aes(x = Date, y = d18O, color = WaterType, shape = WaterType), size = size.st, show.legend = FALSE) +
+             aes(x = Date, y = d18O), color = color.lake, shape = shape.lake, size = size.st, show.legend = FALSE) +
 
   labs(x = NULL,
        y = axis.x.label,
-       title = "Meteoric waters") +
+       title = "Lake waters") +
   
-  scale_x_date(limits = as.Date(c("2016-01-01", "2021-12-31"))) +
-  
-  # Legend
-  scale_shape_manual(
-    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface"), 
-    # Set plot element shapes
-    values = c(
-      "Lake" = shape.lake,
-      "Restricted Lake" = shape.surface.lake,
-      "River" = shape.river,
-      "Precipitation" = shape.precip,
-      "Surface" = shape.surface)) +
-  
-  scale_color_manual(
-    breaks = c("Lake", "Restricted Lake", "River", "Precipitation", "Surface"), 
-    # Set plot element colors
-    values = c(
-      "Lake" = color.lake,
-      "Restricted Lake" = color.lake,
-      "River" = color.river,
-      "Precipitation" = color.precip,
-      "Surface" = color.surface)) 
+  scale_x_date(limits = as.Date(c("2016-01-01", "2021-12-31"))) 
 
 fig3B <- ggplot() + 
   geom_line(data = lake.height, aes(x = Date, y = meters.above.sea.level)) + 
@@ -608,6 +590,8 @@ scenario.k <- ggplot(data = vary.k, aes(x = d18O, y = dD, color = Scenario)) +
        y = c(-30, 60))
 
 plot(scenario.k)
+
+fig4 <- scenario.k + scenario.TC + scenario.rh + plot_layout(ncol=1)
 ```
 
 ```{r plot-LEL-extra, echo = FALSE, include = FALSE}
