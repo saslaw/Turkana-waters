@@ -1,7 +1,7 @@
 ---
 title: 'Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass
   balance'
-date: '2022-03-05'
+date: '2022-03-16'
 output:
   html_notebook:
     highlight: monochrome
@@ -107,10 +107,11 @@ lake.height <- read.csv(here("Turkana-waters/data/GREALM_lake_height.csv")) |>
 
 ```
 
-
 # Data
 
 ## Figure 1. Sample location map
+
+QGIS map is better — distinguish lake vs other samples 
 
 ```{r figure1, echo = FALSE, message = FALSE, warning = FALSE}
 # Load maps 
@@ -150,7 +151,6 @@ fig1A + map.context +
 # save figures for formatting
 
 ```
-
 
 ## Table 1. New measurements
 
@@ -263,10 +263,12 @@ plot(fig2)
 
 ## Figure 3. Time series 
 
+Zoom time series to lake samples (except three anomalies) only 
+
 ```{r figure3, echo = FALSE, warning = FALSE}
 fig3A <- ggplot() +
   
-  geom_point(data = waters.meteoric,
+  geom_point(data = waters.meteoric |> filter(WaterType == "Lake"),
              aes(x = Date, y = d18O, color = WaterType, shape = WaterType), size = size.st, show.legend = FALSE) +
 
   labs(x = NULL,
@@ -319,6 +321,7 @@ fig3A + fig3B +
 *Copied to `evaporation-model.R` script for use in interactive / publication version.*
 
 The function produces a plot-able data frame of d18O and dD values representing isotope composition of evaporate water given isotope values of input water and atmospheric conditions. Formulas and relationships are defined in @gibson2016 and @horita1994.
+
 ```{r define-model}
 model.LEL <- function(env.input){
   
@@ -377,6 +380,7 @@ model.LEL <- function(env.input){
 ## Model inputs
 
 Build model evaporation lines by varying environmental conditions.
+
 ```{r model-inputs-single, echo = FALSE}
 env.conditions <- c(
   
@@ -451,6 +455,7 @@ for (nn in 1:4){
 ```
 
 ### Model with meteoric waters
+
 ```{r plot-overlayed-scenarios, echo = FALSE, warning=FALSE}
 # Multiple scenarios on one plot  
 
@@ -698,7 +703,7 @@ panel.LEL <- ggplot(data = vary.TC, aes(x = d18O, y = dD)) +
 plot(panel.LEL)
 ```
 
-### Test models
+## Test models
 
 Set k = 0.1, equilibrium between precip and vapor above the lake is probably low because vapor isotope composition reflects evaporated lake water, not precip signal, Changing k has little effect on model slope. 
 
@@ -708,9 +713,9 @@ Set TC = 30, close to mean of 11 measured surface temperatures and close to reco
 - Regress lake only
 - Compare models with lake regression
 - Quantify effect of each atmospheric variable on model — how? 
-
-
+- Look for seasonality
 
 ## Mass balance
 
 Estimate lake volumes from [USDA Foreign Agriculture Service](https://ipad.fas.usda.gov/cropexplorer/global_reservoir/gr_regional_chart.aspx?regionid=eafrica&reservoir_name=Turkana&lakeid=000093) and estimate percent increases in inputs needed.
+
