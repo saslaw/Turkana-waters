@@ -1,10 +1,10 @@
 ---
 title: 'Lake Turkana Isotope Hydrology: New measurements, evaporation model, and mass balance'
-date: '2022-05-02'
+date: '2022-05-07'
 output:
-  html_document:
-    highlight: monochrome
   html_notebook:
+    highlight: monochrome
+  html_document:
     highlight: monochrome
   word_document: default
 editor_options:
@@ -72,7 +72,7 @@ size.sm <- 1
 size.lg <- 5
 ```
 
-```{r data-processing, echo = FALSE, message = FALSE}
+```{r data-processing, echo = FALSE, message = FALSE, warnings = FALSE}
 # Load and process data (this study)
 waters.rawdata <- read_csv(here("data/2016-2021_waters.csv"), show_col_types = FALSE)
 waters <- waters.rawdata |>
@@ -105,14 +105,20 @@ waters.Levin <- waters.Levin.rawdata |>
 lake.height <- read.csv(here("data/GREALM_lake_height.csv")) |>
   mutate(Date = mdy(Date))
 
+# Load TBI precipitation records and filter to overlapping dates
+precip <- read.csv(here("data/TBI_precip_records.csv")) |>
+  mutate(date = mdy(date)) |>
+  filter(date > "2016-09-29")
+
 ```
 
 # To do
 
 ## Investigate temporal variability in precip 
 
-- Show ENSO years with time series 
 - Quantify time elapsed between precipitation events and lake water sample collection dates 
+  - What should be the threshold for a significant rain event? 
+- Show ENSO years with time series 
 - Is diurnal variability important (@Nicholson2022)
 
 ## Mass balance
@@ -191,13 +197,18 @@ waters.summary |>
 
 ## Figure 2. Water isotopes  
 
+If removing high d18O point — 
+
+> One groundwater data point showed an anomalously high d18O of 18.95‰. This sample was collected from a saline well, unlike every other sample, and is omitted from Figure 2 in order to better represent the relationship between measured values and the GMWL. 
+
 ```{r figure2, echo = FALSE, warning = FALSE}
 fig2 <- ggplot() +
   
   geom_point(data = waters.Levin,
              aes(x = d18O_VSMOW, y = dD_VSMOW, shape = WaterType), size = size.st, color = "gray77", 
              show.legend = FALSE) +
-  geom_point(data = waters,
+  geom_point(data = waters |>
+               filter(d18O < 18),
              aes(x = d18O, y = dD, color = WaterType, shape = WaterType), size = size.st) +
   geom_abline(data = NULL, aes(slope = 8, intercept = 10, color = "GMWL")) +
   
@@ -242,7 +253,7 @@ fig2 <- ggplot() +
 plot(fig2)
 
 # save figure for formatting
-# ggsave(here("figures-tables/Figure2.eps"), fig2, "eps")
+ggsave(here("figures-tables/Figure2.eps"), fig2, "eps")
 ```
 
 ## Figure 3. Time series 
